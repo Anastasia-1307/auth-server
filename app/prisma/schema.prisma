@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model auth_keys {
+  kid         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  public_key  String
+  private_key String
+  algorithm   String?   @default("RS256")
+  is_active   Boolean?  @default(true)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model oauth_clients {
+  client_id          String   @id
+  client_secret_hash String?
+  redirect_uris      String[]
+  name               String?
+}
+
+model oauth_users {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(255)
+  username      String    @db.VarChar(100)
+  password_hash String
+  role          String    @default("pacient") @db.VarChar(50)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model refresh_tokens {
+  token_id   String    @id @db.VarChar(128)
+  user_id    String?   @db.Uuid
+  client_id  String    @db.VarChar(255)
+  scope      String?
+  expires_at DateTime  @db.Timestamptz(6)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_rt_user")
+}
+
+model sessions {
+  id            Int       @id @default(autoincrement())
+  session_token String    @unique @db.VarChar(64)
+  user_id       String?   @db.Uuid
+  expires_at    DateTime  @db.Timestamp(6)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  users         users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expires_at], map: "idx_sessions_expires_at")
+  @@index([session_token], map: "idx_sessions_token")
+  @@index([user_id], map: "idx_sessions_user_id")
+}
+
+model users {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String           @unique @db.VarChar(255)
+  username       String           @unique @db.VarChar(30)
+  password_hash  String
+  role           String?          @default("pacient") @db.VarChar(20)
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  refresh_tokens refresh_tokens[]
+  sessions       sessions[]
+  programari     programari[]
+  user_logs      user_logs[]
+}
+
+model programari {
+  id              Int       @id @default(autoincrement())
+  user_id         String    @db.Uuid
+  serviciu        String    @db.VarChar(255)
+  data_programare DateTime  @db.Timestamp(6)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  users           users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+
+model user_logs {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?  @db.Uuid
+  action     String   @db.VarChar(100)
+  resource   String?  @db.VarChar(255)
+  ip_address String?  @db.VarChar(45)
+  user_agent String?
+  details    Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users?   @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([action])
+  @@index([created_at])
+}
