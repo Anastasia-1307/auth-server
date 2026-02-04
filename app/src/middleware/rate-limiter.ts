@@ -11,7 +11,7 @@ const authLimiter = new RateLimiterMemory({
 
 const tokenLimiter = new RateLimiterMemory({
   keyPrefix: 'token_limit',
-  points: 10, // Number of requests
+  points: 20, // Number of requests
   duration: 300, // Per 5 minutes
   blockDuration: 300, // Block for 5 minutes
 });

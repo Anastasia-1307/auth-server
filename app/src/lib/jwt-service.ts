@@ -3,6 +3,17 @@ import { prisma } from "./prisma";
 import { config } from "./config";
 import { generateKeyPairSync, randomUUID } from "crypto";
 
+export interface JWTPayload {
+  sub: string;
+  email: string;
+  name: string;
+  role: string;
+  aud?: string;
+  iss?: string;
+  iat?: number;
+  exp?: number;
+}
+
 let privateKey: CryptoKey | null = null;
 let publicKey: CryptoKey | null = null;
 let keyId: string | null = null;
@@ -108,7 +119,7 @@ export async function verifyToken(token: string, audience?: string) {
     const { payload } = await jwtVerify(token, publicKey, verificationOptions);
     console.log("🔍 verifyToken - Payload received:", payload);
     console.log("🔍 verifyToken - Payload type:", typeof payload);
-    return payload;
+    return payload as unknown as JWTPayload;
   } catch (err) {
     console.log("❌ verifyToken - JWT verification error:", err);
     throw err;

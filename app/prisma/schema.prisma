@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
+  binaryTargets = ["native", "linux-musl"]
 }
 
 datasource db {
@@ -25,7 +26,7 @@ model oauth_clients {
 }
 
 model oauth_users {
-  id            Int       @id @default(autoincrement())
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email         String    @unique @db.VarChar(255)
   username      String    @db.VarChar(100)
   password_hash String
@@ -67,22 +68,28 @@ model users {
   role           String?          @default("pacient") @db.VarChar(20)
   created_at     DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  // Relații pentru pacient
+  programari     programari[]
   refresh_tokens refresh_tokens[]
   sessions       sessions[]
-  programari     programari[]
-  user_logs      user_logs[]
+  // Relații pentru medic
+  medic_info     medic_info?
+  program_lucru  program_lucru[]
+  programari_medic programari[] @relation("MedicProgramari")
 }
 
 model programari {
   id              Int       @id @default(autoincrement())
   user_id         String    @db.Uuid
+  medic_id        String    @db.Uuid
   serviciu        String    @db.VarChar(255)
   data_programare DateTime  @db.Timestamp(6)
+  status          String?   @default("confirmata") @db.VarChar(20)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
   updated_at      DateTime? @default(now()) @db.Timestamptz(6)
-  users           users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  medic          users     @relation("MedicProgramari", fields: [medic_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
-
 
 model user_logs {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -93,7 +100,6 @@ model user_logs {
   user_agent String?
   details    Json?
   created_at DateTime @default(now()) @db.Timestamptz(6)
-  users      users?   @relation(fields: [user_id], references: [id])
 
   @@index([user_id])
   @@index([action])
