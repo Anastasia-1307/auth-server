@@ -1,7 +1,7 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
-  binaryTargets = ["native", "linux-musl"]
+  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -10,10 +10,10 @@ datasource db {
 }
 
 model auth_keys {
-  kid         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kid         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   public_key  String
   private_key String
-  algorithm   String?   @default("RS256")
+  algorithm   String?  @default("RS256")
   is_active   Boolean?  @default(true)
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
 }
@@ -42,7 +42,7 @@ model refresh_tokens {
   scope      String?
   expires_at DateTime  @db.Timestamptz(6)
   created_at DateTime? @default(now()) @db.Timestamptz(6)
-  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([user_id], map: "idx_rt_user")
 }
@@ -51,9 +51,9 @@ model sessions {
   id            Int       @id @default(autoincrement())
   session_token String    @unique @db.VarChar(64)
   user_id       String?   @db.Uuid
-  expires_at    DateTime  @db.Timestamp(6)
-  created_at    DateTime? @default(now()) @db.Timestamp(6)
-  users         users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expires_at    DateTime  @db.Timestamptz(6)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  users         users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([expires_at], map: "idx_sessions_expires_at")
   @@index([session_token], map: "idx_sessions_token")
@@ -68,27 +68,20 @@ model users {
   role           String?          @default("pacient") @db.VarChar(20)
   created_at     DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
-  // Relații pentru pacient
   programari     programari[]
   refresh_tokens refresh_tokens[]
   sessions       sessions[]
-  // Relații pentru medic
-  medic_info     medic_info?
-  program_lucru  program_lucru[]
-  programari_medic programari[] @relation("MedicProgramari")
+
 }
 
 model programari {
   id              Int       @id @default(autoincrement())
   user_id         String    @db.Uuid
-  medic_id        String    @db.Uuid
   serviciu        String    @db.VarChar(255)
-  data_programare DateTime  @db.Timestamp(6)
-  status          String?   @default("confirmata") @db.VarChar(20)
+  data_programare DateTime  @db.Timestamptz(6)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
   updated_at      DateTime? @default(now()) @db.Timestamptz(6)
   users           users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  medic          users     @relation("MedicProgramari", fields: [medic_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model user_logs {
@@ -105,3 +98,36 @@ model user_logs {
   @@index([action])
   @@index([created_at])
 }
+
+model specialitati {
+  id              Int       @id @default(autoincrement())
+  nume            String    @db.VarChar(100)
+  descriere       String?   @db.Text
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  medic_info      medic_info[]
+}
+
+model medic_info {
+  id              Int       @id @default(autoincrement())
+  nume            String    @db.VarChar(100)
+  prenume         String    @db.VarChar(100)
+  experienta      Int
+  specialitate_id Int
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  specialitati    specialitati @relation(fields: [specialitate_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  program_lucru   program_lucru[]
+}
+
+model program_lucru {
+  id              Int       @id @default(autoincrement())
+  medic_info_id   Int
+  ora_inceput     DateTime? @db.Timestamptz(6)
+  ora_sfarsit     DateTime? @db.Timestamptz(6)
+  activ           Boolean   @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  medic_info      medic_info @relation(fields: [medic_info_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
