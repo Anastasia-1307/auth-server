@@ -40,6 +40,8 @@ export async function createOAuthUser(data: {
 }
 
 export async function authenticateOAuthUser(email: string, password: string) {
+  console.log("🔍 authenticateOAuthUser - Căutare utilizator pentru email:", email);
+  
   const user = await prisma.oauth_users.findUnique({
     where: { email },
     select: { 
@@ -50,10 +52,31 @@ export async function authenticateOAuthUser(email: string, password: string) {
     }
   });
 
-  if (!user || !(await Bun.password.verify(password, user.password_hash))) {
+  console.log("🔍 authenticateOAuthUser - Utilizator găsit:", !!user);
+  if (user) {
+    console.log("🔍 authenticateOAuthUser - User details:", {
+      id: user.id,
+      username: user.username,
+      email: user.email || 'N/A',
+      role: user.role
+    });
+  }
+
+  if (!user) {
+    console.log("❌ authenticateOAuthUser - Utilizatorul nu există în BD");
     throw new Error("Credentiale invalide");
   }
 
+  console.log("🔍 authenticateOAuthUser - Verificare parolă...");
+  const passwordMatch = await Bun.password.verify(password, user.password_hash);
+  console.log("🔍 authenticateOAuthUser - Parolă validă:", passwordMatch);
+
+  if (!passwordMatch) {
+    console.log("❌ authenticateOAuthUser - Parolă incorectă");
+    throw new Error("Credentiale invalide");
+  }
+
+  console.log("✅ authenticateOAuthUser - Autentificare reușită pentru:", user.username);
   return user;
 }
 

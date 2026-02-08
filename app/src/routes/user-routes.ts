@@ -3,7 +3,52 @@ import { verifyToken, JWTPayload } from "../lib/jwt-service";
 import { logResourceAccess, logAuthActivity, logSecurityEvent } from "../services/user-activity-service";
 import { config } from "../lib/config";
 
+console.log("🔍 user-routes.ts - Fișierul se încarcă");
+
 export const userRoutes = new Elysia()
+  .post("/verify-token", async ({ request }) => {
+    try {
+      const body = await request.json();
+      const { token } = body;
+
+      if (!token) {
+        return {
+          status: 400,
+          body: { error: "Token is required" }
+        };
+      }
+
+      console.log("🔍 /verify-token - Token received:", token.substring(0, 20) + "...");
+
+      const payload = await verifyToken(token);
+      console.log("🔍 /verify-token - Payload received:", payload);
+
+      return {
+        status: 200,
+        body: payload
+      };
+    } catch (err) {
+      console.log("❌ /verify-token - Token verification failed:", err instanceof Error ? err.message : String(err));
+      
+      // Log unauthorized access attempt with invalid token
+      const ipAddress = request.headers.get("x-forwarded-for") || 
+                       request.headers.get("x-real-ip") || 
+                       "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+      
+      await logSecurityEvent('unauthorized_access', {
+        ipAddress,
+        userAgent,
+        details: { reason: 'invalid_token', error: err instanceof Error ? err.message : 'Unknown error' }
+      });
+
+      return {
+        status: 401,
+        body: { error: "Invalid token" }
+      };
+    }
+  })
+
   .get("/me", async ({ request, set }) => {
     const auth = request.headers.get("authorization");
     console.log("🔍 /me endpoint - Auth header:", auth);

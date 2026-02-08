@@ -8,6 +8,8 @@ import { prisma } from "../lib/prisma";
 import { randomUUID } from "crypto";
 import { logAuthActivity, logResourceAccess, logFailedOAuthActivity } from "../services/user-activity-service";
 
+console.log("🔍 oauth-routes.ts - Fișierul se încarcă");
+
 interface AuthCode {
   clientId: string;
   redirectUri: string;
@@ -126,9 +128,12 @@ export const oauthRoutes = new Elysia()
       
       console.log("🔍 /oauth-register - Code saved, total codes:", authorizationCodes.size);
 
-      const url = new URL(`${config.issuer}/oauth-login`);
+      const url = new URL(`${config.issuer}/oauth/login`);
       url.searchParams.set("code", authCode);
       url.searchParams.set("state", state);
+      url.searchParams.set("client_id", client_id);
+      url.searchParams.set("redirect_uri", redirect_uri);
+      url.searchParams.set("code_challenge", code_challenge);
       
       console.log("🔍 /oauth-register - Redirecting to:", url.toString());
 
@@ -180,7 +185,37 @@ export const oauthRoutes = new Elysia()
     }
   })
 
+  .get("/oauth/login", async ({ query }) => {
+    const clientId = String(query.client_id ?? "");
+    const redirectUri = String(query.redirect_uri ?? "");
+    const codeChallenge = String(query.code_challenge ?? "");
+    const stateValue = String(query.state ?? "");
+    const codeValue = String(query.code ?? "");
+    const backLink = "http://localhost:3000/login";
+
+    console.log("🔍 GET /oauth/login - Query params received:");
+    console.log("  - client_id:", clientId);
+    console.log("  - redirect_uri:", redirectUri);
+    console.log("  - code_challenge:", codeChallenge);
+    console.log("  - state:", stateValue);
+    console.log("  - code:", codeValue);
+
+    const html = renderTemplate("src/views/oauth-login.html", {
+      clientId,
+      redirectUri,
+      codeChallenge,
+      state: stateValue,
+      code: codeValue,
+      backLink
+    });
+
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=UTF-8" }
+    });
+  })
+
   .post("/oauth-login", async ({ body, redirect, request }) => {
+    console.log("🔍 POST /oauth-login - Rută accesată");
     try {
       const { email, password, client_id, redirect_uri, code_challenge, state } = body as any;
       
