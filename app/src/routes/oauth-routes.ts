@@ -68,8 +68,8 @@ export const oauthRoutes = new Elysia()
       };
     }
 
-    const page = screen === "register" ? "oauth-login" : "oauth-login";
-    const url = new URL(`${config.issuer}/oauth/login`);
+    const page = screen === "register" ? "register" : "login";
+    const url = new URL(`${config.issuer}/oauth/${page}`);
     url.searchParams.set("client_id", client_id as string);
     url.searchParams.set("redirect_uri", redirect_uri as string);
     url.searchParams.set("code_challenge", code_challenge as string);

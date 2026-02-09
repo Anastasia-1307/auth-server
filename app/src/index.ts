@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Elysia } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { cors } from "@elysiajs/cors";

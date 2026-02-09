@@ -164,7 +164,7 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
         ...classicUsers.map(user => ({ ...user, userType: 'classic' })),
         ...oauthUsers.map(user => ({ ...user, userType: 'oauth' }))
       ];
-
+      
       await logAdminActivity(payload.email, 'view_users', {
         users_count: allUsers.length,
         classic_users: classicUsers.length,
