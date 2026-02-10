@@ -536,4 +536,250 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
       console.error("Error fetching stats:", error);
       return { error: "Eroare la încărcarea statisticilor" };
     }
+  })
+
+  // Get password reset tokens
+  .get("/password-reset-tokens", async ({ payload, request }) => {
+    try {
+      const ipAddress = request.headers.get("x-forwarded-for") || 
+                       request.headers.get("x-real-ip") || 
+                       "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+
+      console.log("🔍 Fetching password reset tokens...");
+      console.log("🔍 Prisma client available:", !!prisma);
+      console.log("🔍 Table exists check...");
+
+      // Fetch all password reset tokens without the actual token field
+      const tokens = await prisma.password_reset_tokens.findMany({
+        select: {
+          id: true,
+          email: true,
+          expires_at: true,
+          created_at: true,
+          used: true,
+          user_type: true
+          // Note: 'token' field is excluded for security
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      });
+
+      console.log("🔍 Successfully fetched tokens:", tokens.length);
+
+      await logAdminActivity(payload.email, 'view_stats', {
+        action: 'view_password_reset_tokens',
+        tokens_count: tokens.length
+      }, ipAddress, userAgent);
+
+      return { tokens };
+    } catch (error) {
+      console.error("🔍 Error fetching password reset tokens:", error);
+      console.error("🔍 Error details:", error instanceof Error ? error.message : 'Unknown error');
+      console.error("🔍 Error stack:", error instanceof Error ? error.stack : 'No stack');
+      
+      return { error: "Eroare la încărcarea token-urilor de resetare" };
+    }
+  })
+
+  // GET - Fetch all program lucru
+  .get("/program-lucru", async ({ payload, request }) => {
+    try {
+      console.log("🔍 Auth-server: GET /program-lucru called");
+      
+      const ipAddress = request.headers.get("x-forwarded-for") || 
+                       request.headers.get("x-real-ip") || 
+                       "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+
+      console.log("🔍 Fetching program lucru...");
+
+      // Fetch all program lucru
+      const programs = await prisma.program_lucru.findMany({
+        orderBy: {
+          created_at: 'desc'
+        }
+      });
+
+      console.log("🔍 Successfully fetched program lucru:", programs.length);
+      console.log("🔍 Programs data:", programs);
+
+      await logAdminActivity(payload.email, 'view_stats', {
+        action: 'view_program_lucru',
+        programs_count: programs.length
+      }, ipAddress, userAgent);
+
+      return { programLucru: programs };
+    } catch (error) {
+      console.error("🔍 Error fetching program lucru:", error);
+      console.error("🔍 Error details:", error instanceof Error ? error.message : 'Unknown error');
+      console.error("🔍 Error stack:", error instanceof Error ? error.stack : 'No stack');
+      
+      return { error: "Eroare la încărcarea programelor de lucru" };
+    }
+  })
+
+  // POST - Create new program lucru
+  .post("/program-lucru", async ({ body, payload, request }) => {
+    console.log("🔍 Auth-server: POST /program-lucru received - START");
+    console.log("🔍 Auth-server: Request body:", body);
+    console.log("🔍 Auth-server: Payload:", payload);
+    
+    try {
+      const ipAddress = request.headers.get("x-forwarded-for") || 
+                       request.headers.get("x-real-ip") || 
+                       "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+
+      console.log("🔍 Creating program lucru with data:", body);
+
+      const { medic_info_id, ora_inceput, ora_sfarsit, activ } = body as any;
+
+      // Validate required fields
+      if (!medic_info_id || !ora_inceput || !ora_sfarsit) {
+        return { error: "Toate câmpurile obligatorii trebuie completate" };
+      }
+
+      // Check if medic_info_id exists
+      const medicExists = await prisma.medic_info.findUnique({
+        where: { id: parseInt(medic_info_id) }
+      });
+
+      if (!medicExists) {
+        console.log("🔍 Medic info not found for ID:", medic_info_id);
+        return { error: `Medic cu ID ${medic_info_id} nu există` };
+      }
+
+      console.log("🔍 Medic info found:", medicExists);
+
+      // Convert time strings to DateTime objects
+      const oraInceputDateTime = new Date();
+      const [startHour, startMinute] = ora_inceput.split(':');
+      oraInceputDateTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+      
+      const oraSfarsitDateTime = new Date();
+      const [endHour, endMinute] = ora_sfarsit.split(':');
+      oraSfarsitDateTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
+
+      // Create program lucru
+      const newProgram = await prisma.program_lucru.create({
+        data: {
+          medic_info_id: parseInt(medic_info_id),
+          ora_inceput: oraInceputDateTime,
+          ora_sfarsit: oraSfarsitDateTime,
+          activ: activ !== undefined ? activ : true
+        }
+      });
+
+      console.log("🔍 Successfully created program lucru:", newProgram.id);
+
+      await logAdminActivity(payload.email, 'view_stats', {
+        action: 'create_program_lucru',
+        program_id: newProgram.id,
+        medic_info_id: newProgram.medic_info_id
+      }, ipAddress, userAgent);
+
+      return { programLucru: newProgram };
+    } catch (error) {
+      console.log("🔍 Auth-server: CATCH BLOCK - ERROR OCCURRED");
+      console.error("🔍 Error creating program lucru:", error);
+      console.error("🔍 Error details:", error instanceof Error ? error.message : 'Unknown error');
+      console.error("🔍 Error stack:", error instanceof Error ? error.stack : 'No stack');
+      console.error("🔍 Request body received:", body);
+      console.error("🔍 Payload:", payload);
+      
+      return { error: "Eroare la crearea programului de lucru" };
+    }
+  })
+
+  // PUT - Update program lucru
+  .put("/program-lucru/:id", async ({ params, body, payload, request }) => {
+    try {
+      const ipAddress = request.headers.get("x-forwarded-for") || 
+                       request.headers.get("x-real-ip") || 
+                       "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+
+      console.log("🔍 Updating program lucru ID:", params.id, "with data:", body);
+
+      const { ora_inceput, ora_sfarsit, activ } = body as any;
+      const id = parseInt(params.id);
+
+      // Check if program exists
+      const existingProgram = await prisma.program_lucru.findUnique({
+        where: { id }
+      });
+
+      if (!existingProgram) {
+        return { error: "Programul de lucru nu a fost găsit" };
+      }
+
+      // Update program lucru
+      const updatedProgram = await prisma.program_lucru.update({
+        where: { id },
+        data: {
+          ...(ora_inceput && { ora_inceput }),
+          ...(ora_sfarsit && { ora_sfarsit }),
+          ...(activ !== undefined && { activ })
+        }
+      });
+
+      console.log("🔍 Successfully updated program lucru:", updatedProgram.id);
+
+      await logAdminActivity(payload.email, 'view_stats', {
+        action: 'update_program_lucru',
+        program_id: updatedProgram.id,
+        medic_info_id: updatedProgram.medic_info_id
+      }, ipAddress, userAgent);
+
+      return { programLucru: updatedProgram };
+    } catch (error) {
+      console.error("🔍 Error updating program lucru:", error);
+      console.error("🔍 Error details:", error instanceof Error ? error.message : 'Unknown error');
+      
+      return { error: "Eroare la actualizarea programului de lucru" };
+    }
+  })
+
+  // DELETE - Delete program lucru
+  .delete("/program-lucru/:id", async ({ params, payload, request }) => {
+    try {
+      const ipAddress = request.headers.get("x-forwarded-for") || 
+                       request.headers.get("x-real-ip") || 
+                       "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+
+      console.log("🔍 Deleting program lucru ID:", params.id);
+      const id = parseInt(params.id);
+
+      // Check if program exists
+      const existingProgram = await prisma.program_lucru.findUnique({
+        where: { id }
+      });
+
+      if (!existingProgram) {
+        return { error: "Programul de lucru nu a fost găsit" };
+      }
+
+      // Delete program lucru
+      await prisma.program_lucru.delete({
+        where: { id }
+      });
+
+      console.log("🔍 Successfully deleted program lucru:", id);
+
+      await logAdminActivity(payload.email, 'view_stats', {
+        action: 'delete_program_lucru',
+        program_id: id,
+        medic_info_id: existingProgram.medic_info_id
+      }, ipAddress, userAgent);
+
+      return { success: true };
+    } catch (error) {
+      console.error("🔍 Error deleting program lucru:", error);
+      console.error("🔍 Error details:", error instanceof Error ? error.message : 'Unknown error');
+      
+      return { error: "Eroare la ștergerea programului de lucru" };
+    }
   });

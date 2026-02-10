@@ -25,6 +25,11 @@
       cursor: pointer; font-size: 1rem; transition: 0.2s;
     }
     button:hover { background: #5970d6; }
+    .forgot-link { 
+      display: block; margin-top: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem; color: #6e8efb; text-decoration: none; 
+      transition: 0.2s; text-align: center;
+    }
+    .forgot-link:hover { text-decoration: underline; }
     .back-link { 
       display: block; margin-top: 1rem; font-size: 0.9rem; color: #6e8efb; text-decoration: none; 
       transition: 0.2s;
@@ -43,7 +48,9 @@
       <input type="hidden" name="code" value="{{code}}" />
       <input type="email" name="email" placeholder="Email" required />
       <input type="password" name="password" placeholder="Parolă" required />
+      
       <button>Conectare</button>
+      <a href="http://localhost:3000/forgot-password" class="forgot-link">Am uitat parola</a>
     </form>
     <a class="back-link" href="{{backLink}}">&larr; Înapoi</a>
   </div>

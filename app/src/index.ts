@@ -17,6 +17,12 @@ import { rateLimitPlugin } from "./middleware/rate-limiter";
 import { prisma } from "./lib/prisma";
 
 const app = new Elysia()
+  .onRequest(({ request }) => {
+  console.log(
+    `🔍 ${request.method} ${request.url}`,
+    Object.fromEntries(request.headers.entries())
+  );
+})
     .use(errorHandler)
     .use(rateLimitPlugin)
     .use(cookie())
@@ -26,6 +32,7 @@ const app = new Elysia()
       allowedHeaders: ['Content-Type', 'Authorization']
     }))
     .use(openapi())
+  
     .use(authRoutes)
     .use(oauthRoutes)
     .use(wellKnownRoutes)

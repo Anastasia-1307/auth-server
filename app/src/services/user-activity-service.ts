@@ -45,8 +45,9 @@ export async function logUserActivity(data: LogActivityData) {
 }
 
 export async function logAuthActivity(
-  action: 'login' | 'register' | 'logout',
+  action: 'login' | 'register' | 'logout' | 'password_reset_requested' | 'password_reset_completed',
   email: string,
+  details?: any,
   ipAddress?: string,
   userAgent?: string
 ) {
@@ -59,7 +60,7 @@ export async function logAuthActivity(
     resource: 'auth',
     ip_address: ipAddress,
     user_agent: userAgent,
-    details: { email }
+    details: { email, ...details }
   });
 }
 
@@ -141,7 +142,7 @@ export async function logResourceAccess(
 }
 
 export async function logFailedAuthActivity(
-  action: 'login_failed' | 'register_failed',
+  action: 'login_failed' | 'register_failed' | 'password_reset_request_failed' | 'password_reset_failed',
   email: string,
   reason: string,
   ipAddress?: string,

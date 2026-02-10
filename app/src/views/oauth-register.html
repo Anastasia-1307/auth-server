@@ -25,6 +25,11 @@
       cursor: pointer; font-size: 1rem; transition: 0.2s;
     }
     button:hover { background: #38c06f; }
+    .login-link { 
+      display: block; margin-top: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem; color: #43e97b; text-decoration: none; 
+      transition: 0.2s; text-align: center;
+    }
+    .login-link:hover { text-decoration: underline; }
     .back-link { 
       display: block; margin-top: 1rem; font-size: 0.9rem; color: #43e97b; text-decoration: none; 
       transition: 0.2s;
@@ -45,6 +50,7 @@
       <input type="password" name="password" placeholder="Parolă" required />
       <button>Creează cont</button>
     </form>
+    <a href="/oauth/login?{{loginParams}}" class="login-link">Ai deja cont? Conectare</a>
     <a class="back-link" href="{{backLink}}">&larr; Înapoi</a>
   </div>
 </body>
