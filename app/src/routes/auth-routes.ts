@@ -4,7 +4,9 @@ import { signAccessToken } from "../lib/jwt-service";
 import { logAuthActivity, logFailedAuthActivity } from "../services/user-activity-service";
 import { PasswordResetService } from "../services/password-reset-service";
 import { EmailService } from "../services/email-service";
+import { RefreshTokenService } from "../services/refresh-token-service";
 import { config } from "../lib/config";
+import { prisma } from "../lib/prisma";
 
 export const authRoutes = new Elysia({ prefix: "/auth" })
   .post("/register", async ({ body, set, request }) => {
@@ -36,12 +38,16 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         role: userRole,
         sub: user.id.toString()
       });
+
+      console.log("🔍 Generating refresh token...");
+      const refreshToken = await RefreshTokenService.createRefreshToken(user.id.toString());
       
-      console.log("✅ Token generated successfully");
+      console.log("✅ Tokens generated successfully");
       
       set.status = 201;
       return {
         token: accessToken,
+        refreshToken: refreshToken,
         user: {
           id: user.id,
           email: user.email,
@@ -106,8 +112,12 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         sub: user.id.toString()
       });
 
+      console.log("🔍 Generating refresh token...");
+      const refreshToken = await RefreshTokenService.createRefreshToken(user.id.toString());
+
       return {
         token: accessToken,
+        refreshToken: refreshToken,
         user: {
           id: user.id,
           email: user.email,
@@ -278,4 +288,87 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     
     set.status = 405;
     return { error: "Method not allowed" };
+  })
+
+  .post("/refresh-token", async ({ body, set, request }) => {
+    try {
+      const { refreshToken } = body as { refreshToken: string };
+      
+      if (!refreshToken) {
+        set.status = 400;
+        return { error: "Refresh token is required" };
+      }
+
+      console.log("🔄 Refresh token request received:", refreshToken.substring(0, 20) + "...");
+
+      // Validează și rotește refresh token-ul
+      const newRefreshToken = await RefreshTokenService.rotateRefreshToken(refreshToken);
+      
+      if (!newRefreshToken) {
+        set.status = 401;
+        return { error: "Invalid or expired refresh token" };
+      }
+
+      // Obține user data din token-ul vechi
+      const tokenData = await RefreshTokenService.validateRefreshToken(refreshToken);
+      
+      if (!tokenData) {
+        set.status = 401;
+        return { error: "Invalid refresh token" };
+      }
+
+      // Generează nou access token
+      const user = await prisma.users.findUnique({
+        where: { id: tokenData.user_id },
+        select: { id: true, email: true, username: true, role: true }
+      });
+
+      if (!user) {
+        set.status = 401;
+        return { error: "User not found" };
+      }
+
+      const accessToken = await signAccessToken({
+        email: user.email,
+        name: user.username,
+        role: user.role || "pacient",
+        sub: user.id.toString()
+      });
+
+      console.log("🔄 Tokens refreshed successfully for user:", user.email);
+
+      return {
+        token: accessToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          role: user.role || "pacient"
+        }
+      };
+
+    } catch (error) {
+      console.error("🔄 Refresh token error:", error);
+      set.status = 500;
+      return { error: "Internal server error" };
+    }
+  })
+
+  .post("/logout", async ({ body, set, request }) => {
+    try {
+      const { refreshToken } = body as { refreshToken?: string };
+      
+      if (refreshToken) {
+        await RefreshTokenService.revokeRefreshToken(refreshToken);
+        console.log("🔄 Refresh token revoked on logout");
+      }
+
+      return { message: "Logged out successfully" };
+
+    } catch (error) {
+      console.error("🔄 Logout error:", error);
+      set.status = 500;
+      return { error: "Internal server error" };
+    }
   });

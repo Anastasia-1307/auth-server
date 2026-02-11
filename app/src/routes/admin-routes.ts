@@ -654,13 +654,36 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
       console.log("🔍 Medic info found:", medicExists);
 
       // Convert time strings to DateTime objects
-      const oraInceputDateTime = new Date();
-      const [startHour, startMinute] = ora_inceput.split(':');
-      oraInceputDateTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+      let oraInceputDateTime: Date;
+      let oraSfarsitDateTime: Date;
       
-      const oraSfarsitDateTime = new Date();
-      const [endHour, endMinute] = ora_sfarsit.split(':');
-      oraSfarsitDateTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
+      console.log("🔍 Raw ora_inceput:", ora_inceput);
+      console.log("🔍 Raw ora_sfarsit:", ora_sfarsit);
+      
+      // Check if we received ISO strings (from frontend) or HH:MM strings
+      if (ora_inceput.includes('T') && ora_inceput.includes('Z')) {
+        // ISO string format - use directly
+        oraInceputDateTime = new Date(ora_inceput);
+        console.log("🔍 Using ISO format for ora_inceput:", oraInceputDateTime);
+      } else {
+        // HH:MM format - convert to today's date
+        oraInceputDateTime = new Date();
+        const [startHour, startMinute] = ora_inceput.split(':');
+        oraInceputDateTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+        console.log("🔍 Using HH:MM format for ora_inceput:", oraInceputDateTime);
+      }
+      
+      if (ora_sfarsit.includes('T') && ora_sfarsit.includes('Z')) {
+        // ISO string format - use directly
+        oraSfarsitDateTime = new Date(ora_sfarsit);
+        console.log("🔍 Using ISO format for ora_sfarsit:", oraSfarsitDateTime);
+      } else {
+        // HH:MM format - convert to today's date
+        oraSfarsitDateTime = new Date();
+        const [endHour, endMinute] = ora_sfarsit.split(':');
+        oraSfarsitDateTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
+        console.log("🔍 Using HH:MM format for ora_sfarsit:", oraSfarsitDateTime);
+      }
 
       // Create program lucru
       const newProgram = await prisma.program_lucru.create({
@@ -680,7 +703,11 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
         medic_info_id: newProgram.medic_info_id
       }, ipAddress, userAgent);
 
-      return { programLucru: newProgram };
+      return { 
+        success: true,
+        message: "Program de lucru creat cu succes",
+        programLucru: newProgram
+      };
     } catch (error) {
       console.log("🔍 Auth-server: CATCH BLOCK - ERROR OCCURRED");
       console.error("🔍 Error creating program lucru:", error);
@@ -716,13 +743,46 @@ export const adminRoutes = new Elysia({ prefix: "/admin" })
       }
 
       // Update program lucru
+      let updateData: any = {
+        ...(activ !== undefined && { activ })
+      };
+      
+      // Handle time updates if provided
+      if (ora_inceput) {
+        if (ora_inceput.includes('T') && ora_inceput.includes('Z')) {
+          // ISO string format - use directly
+          updateData.ora_inceput = new Date(ora_inceput);
+          console.log("🔍 PUT: Using ISO format for ora_inceput:", updateData.ora_inceput);
+        } else {
+          // HH:MM format - convert to today's date
+          const oraInceputDateTime = new Date();
+          const [startHour, startMinute] = ora_inceput.split(':');
+          oraInceputDateTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+          updateData.ora_inceput = oraInceputDateTime;
+          console.log("🔍 PUT: Using HH:MM format for ora_inceput:", oraInceputDateTime);
+        }
+      }
+      
+      if (ora_sfarsit) {
+        if (ora_sfarsit.includes('T') && ora_sfarsit.includes('Z')) {
+          // ISO string format - use directly
+          updateData.ora_sfarsit = new Date(ora_sfarsit);
+          console.log("🔍 PUT: Using ISO format for ora_sfarsit:", updateData.ora_sfarsit);
+        } else {
+          // HH:MM format - convert to today's date
+          const oraSfarsitDateTime = new Date();
+          const [endHour, endMinute] = ora_sfarsit.split(':');
+          oraSfarsitDateTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
+          updateData.ora_sfarsit = oraSfarsitDateTime;
+          console.log("🔍 PUT: Using HH:MM format for ora_sfarsit:", oraSfarsitDateTime);
+        }
+      }
+      
+      console.log("🔍 PUT: Final update data:", updateData);
+      
       const updatedProgram = await prisma.program_lucru.update({
         where: { id },
-        data: {
-          ...(ora_inceput && { ora_inceput }),
-          ...(ora_sfarsit && { ora_sfarsit }),
-          ...(activ !== undefined && { activ })
-        }
+        data: updateData
       });
 
       console.log("🔍 Successfully updated program lucru:", updatedProgram.id);

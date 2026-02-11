@@ -5,8 +5,8 @@ import { renderTemplate } from "../lib/template-engine";
 import { generateCode, sha256Base64Url } from "../lib/crypto-utils";
 import { config } from "../lib/config";
 import { prisma } from "../lib/prisma";
-import { randomUUID } from "crypto";
 import { logAuthActivity, logResourceAccess, logFailedOAuthActivity } from "../services/user-activity-service";
+import { RefreshTokenService } from "../services/refresh-token-service";
 
 console.log("🔍 oauth-routes.ts - Fișierul se încarcă");
 
@@ -122,7 +122,7 @@ export const oauthRoutes = new Elysia()
         clientId: client_id,
         redirectUri: redirect_uri,
         codeChallenge: code_challenge,
-        user: { sub: randomUUID(), email, name: user.username, role: user.role ?? "pacient" },
+        user: { sub: user.id, email, name: user.username, role: user.role ?? "pacient" },
         expiresAt: Date.now() + config.codeExpiration
       });
       
@@ -289,7 +289,7 @@ export const oauthRoutes = new Elysia()
         clientId: client_id,
         redirectUri: redirect_uri,
         codeChallenge: code_challenge,
-        user: { sub: randomUUID(), email, name: user.username, role: user.role ?? "pacient" },
+        user: { sub: user.id, email, name: user.username, role: user.role ?? "pacient" },
         expiresAt: Date.now() + config.codeExpiration
       });
       
@@ -389,8 +389,7 @@ export const oauthRoutes = new Elysia()
       const userAgent = request.headers.get("user-agent") || "unknown";
       
       await logResourceAccess(savedCode.user.email, 'oauth', 'token_exchange', ipAddress, userAgent, { 
-        client_id, 
-        email: savedCode.user.email 
+        client_id: client_id
       });
 
       authorizationCodes.delete(code);
@@ -406,6 +405,13 @@ export const oauthRoutes = new Elysia()
       
       console.log("🔍 /token - Access token generated:", accessToken.substring(0, 20) + "...");
 
+      console.log("🔍 /token - Generating refresh token...");
+      console.log("🔍 /token - savedCode.user.sub:", savedCode.user.sub);
+      console.log("🔍 /token - savedCode.user.sub type:", typeof savedCode.user.sub);
+      const refreshToken = await RefreshTokenService.createRefreshToken(savedCode.user.sub, 'nextjs_client', true);
+      
+      console.log("🔍 /token - Refresh token generated:", refreshToken.substring(0, 20) + "...");
+
       // Sync OAuth user to resource server
       await syncOAuthUserToResourceServer({
         id: savedCode.user.sub,
@@ -414,8 +420,18 @@ export const oauthRoutes = new Elysia()
         role: savedCode.user.role ?? "pacient"
       });
 
-      const response = { access_token: accessToken, token_type: "Bearer", expires_in: 3600 };
-      console.log("🔍 /token - Response:", response);
+      const response = { 
+        access_token: accessToken, 
+        refresh_token: refreshToken, 
+        token_type: "Bearer", 
+        expires_in: 3600 
+      };
+      console.log("🔍 /token - Response:", {
+        access_token: accessToken.substring(0, 20) + "...",
+        refresh_token: refreshToken.substring(0, 20) + "...",
+        token_type: "Bearer",
+        expires_in: 3600
+      });
       
       return response;
     } catch (error) {
