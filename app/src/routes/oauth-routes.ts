@@ -335,13 +335,28 @@ export const oauthRoutes = new Elysia()
 
   .post("/token", async ({ request, set }) => {
     try {
-      const body = await request.json();
-      console.log("🔍 /token endpoint - Body:", body);
+      console.log("🔍 /token endpoint - Request headers:", Object.fromEntries(request.headers.entries()));
+      console.log("🔍 /token endpoint - Content-Type:", request.headers.get('content-type'));
+      
+      let body;
+      try {
+        body = await request.json();
+        console.log("🔍 /token endpoint - Body parsed successfully:", body);
+      } catch (parseError) {
+        console.error("❌ /token endpoint - JSON parse error:", parseError);
+        console.error("❌ /token endpoint - Raw body text:", await request.text());
+        set.status = 400;
+        return { error: "Invalid JSON body" };
+      }
       
       const { grant_type, code, client_id, code_verifier } = body;
 
       if (!grant_type || !code || !client_id || !code_verifier) {
         console.log("❌ /token - Missing required fields");
+        console.log("  - grant_type:", !!grant_type);
+        console.log("  - code:", !!code);
+        console.log("  - client_id:", !!client_id);
+        console.log("  - code_verifier:", !!code_verifier);
         set.status = 400;
         return { error: "Missing required fields" };
       }

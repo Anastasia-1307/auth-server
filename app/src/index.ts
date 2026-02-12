@@ -23,6 +23,23 @@ const app = new Elysia()
     Object.fromEntries(request.headers.entries())
   );
 })
+  .onBeforeHandle(({ request, set }) => {
+    // Add JSON content type handling
+    if (request.method && ['POST', 'PUT', 'PATCH'].includes(request.method)) {
+      const contentType = request.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        // Elysia will automatically parse JSON bodies
+        console.log('🔍 JSON request detected');
+      }
+    }
+  })
+  .onError(({ error, set, code }) => {
+    console.error('🔍 Auth Server Error:', { error: error.message, code });
+    if (code === 'PARSE') {
+      set.status = 400;
+      return { error: 'Invalid JSON body' };
+    }
+  })
     .use(errorHandler)
     .use(rateLimitPlugin)
     .use(cookie())
