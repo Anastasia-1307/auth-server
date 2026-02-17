@@ -52,6 +52,15 @@ export const oauthRoutes = new Elysia()
   .get("/authorize", async ({ query, redirect }) => {
     const { client_id, redirect_uri, response_type, code_challenge, state, scope, screen } = query;
 
+    console.log("🔍 /authorize - Query params received:");
+    console.log("  - client_id:", client_id);
+    console.log("  - redirect_uri:", redirect_uri);
+    console.log("  - response_type:", response_type);
+    console.log("  - code_challenge:", code_challenge);
+    console.log("  - state:", state);
+    console.log("  - scope:", scope);
+    console.log("  - screen:", screen);
+
     if (response_type !== "code") {
       return {
         status: 400,
@@ -76,6 +85,7 @@ export const oauthRoutes = new Elysia()
     if (state) url.searchParams.set("state", state as string);
     if (scope) url.searchParams.set("scope", scope as string);
 
+    console.log("🔍 /authorize - Redirecting to:", url.toString());
     return redirect(url.toString());
   })
 
@@ -200,6 +210,18 @@ export const oauthRoutes = new Elysia()
     console.log("  - state:", stateValue);
     console.log("  - code:", codeValue);
 
+    // If missing required params, redirect to authorize
+    if (!clientId || !redirectUri || !codeChallenge) {
+      console.log("❌ /oauth/login - Missing required params, redirecting to /authorize");
+      const authorizeUrl = new URL(`${config.issuer}/authorize`);
+      authorizeUrl.searchParams.set("response_type", "code");
+      authorizeUrl.searchParams.set("client_id", "nextjs_client");
+      authorizeUrl.searchParams.set("redirect_uri", "http://localhost:3000/oauth/callback");
+      authorizeUrl.searchParams.set("screen", "login");
+      
+      return Response.redirect(authorizeUrl.toString());
+    }
+
     const html = renderTemplate("src/views/oauth-login.html", {
       clientId,
       redirectUri,
@@ -214,24 +236,42 @@ export const oauthRoutes = new Elysia()
     });
   })
 
-  .post("/oauth-login", async ({ body, redirect, request }) => {
+  .post("/oauth-login", async ({ body, query, redirect, request }) => {
     console.log("🔍 POST /oauth-login - Rută accesată");
     try {
       const { email, password, client_id, redirect_uri, code_challenge, state } = body as any;
       
-      console.log("🔍 /oauth-login - Body:", { email, client_id, redirect_uri, hasCodeChallenge: !!code_challenge });
-      console.log("🔍 /oauth-login - Raw code_challenge:", code_challenge);
-      console.log("🔍 /oauth-login - Type of code_challenge:", typeof code_challenge);
-
-      console.log("🔍 /oauth-login - Body received:", { email, password, client_id, redirect_uri, code_challenge, state });
+      // Get code_challenge from query params if not in body
+      const queryCodeChallenge = String(query.code_challenge ?? "");
+      const queryClientId = String(query.client_id ?? "");
+      const queryRedirectUri = String(query.redirect_uri ?? "");
+      const queryState = String(query.state ?? "");
       
-      if (!email || !password || !client_id || !redirect_uri || !code_challenge) {
+      const finalCodeChallenge = code_challenge || queryCodeChallenge;
+      const finalClientId = client_id || queryClientId;
+      const finalRedirectUri = redirect_uri || queryRedirectUri;
+      const finalState = state || queryState;
+      
+      console.log("🔍 /oauth-login - Body:", { email, client_id, redirect_uri, hasCodeChallenge: !!code_challenge });
+      console.log("🔍 /oauth-login - Query:", { client_id: queryClientId, redirect_uri: queryRedirectUri, code_challenge: queryCodeChallenge });
+      console.log("🔍 /oauth-login - Final values:", { 
+        client_id: finalClientId, 
+        redirect_uri: finalRedirectUri, 
+        code_challenge: finalCodeChallenge,
+        state: finalState
+      });
+      console.log("🔍 /oauth-login - Raw code_challenge:", finalCodeChallenge);
+      console.log("🔍 /oauth-login - Type of code_challenge:", typeof finalCodeChallenge);
+
+      console.log("🔍 /oauth-login - Body received:", { email, password, client_id: finalClientId, redirect_uri: finalRedirectUri, code_challenge: finalCodeChallenge, state: finalState });
+      
+      if (!email || !password || !finalClientId || !finalRedirectUri || !finalCodeChallenge) {
         console.log("❌ /oauth-login - Missing required fields:");
         console.log("  - email:", !!email);
         console.log("  - password:", !!password);
-        console.log("  - client_id:", !!client_id);
-        console.log("  - redirect_uri:", !!redirect_uri);
-        console.log("  - code_challenge:", !!code_challenge);
+        console.log("  - client_id:", !!finalClientId);
+        console.log("  - redirect_uri:", !!finalRedirectUri);
+        console.log("  - code_challenge:", !!finalCodeChallenge);
         return {
           status: 400,
           body: { error: "Missing required fields" }
@@ -280,28 +320,28 @@ export const oauthRoutes = new Elysia()
       const userAgent = request.headers.get("user-agent") || "unknown";
       
       await logAuthActivity('login', email, ipAddress, userAgent);
-      await logResourceAccess(email, 'oauth', 'login', ipAddress, userAgent, { client_id });
+      await logResourceAccess(email, 'oauth', 'login', ipAddress, userAgent, { client_id: finalClientId });
 
       const authCode = generateCode();
       console.log("🔍 /oauth-login - Generated code:", authCode);
       
       authorizationCodes.set(authCode, {
-        clientId: client_id,
-        redirectUri: redirect_uri,
-        codeChallenge: code_challenge,
+        clientId: finalClientId,
+        redirectUri: finalRedirectUri,
+        codeChallenge: finalCodeChallenge,
         user: { sub: user.id, email, name: user.username, role: user.role ?? "pacient" },
         expiresAt: Date.now() + config.codeExpiration
       });
       
-      console.log("🔍 /oauth-login - Code saved with challenge:", code_challenge);
+      console.log("🔍 /oauth-login - Code saved with challenge:", finalCodeChallenge);
       console.log("🔍 /oauth-login - Total codes:", authorizationCodes.size);
 
-      const separator = redirect_uri.includes("?") ? "&" : "?";
-      const redirectTo = `${redirect_uri}${separator}code=${authCode}${state ? `&state=${state}` : ""}`;
+      const separator = finalRedirectUri.includes("?") ? "&" : "?";
+      const redirectUrl = `${finalRedirectUri}${separator}code=${authCode}${finalState ? `&state=${finalState}` : ""}`;
       
-      console.log("🔍 /oauth-login - Redirecting to:", redirectTo);
+      console.log("🔍 /oauth-login - Redirecting to:", redirectUrl);
 
-      return redirect(redirectTo);
+      return redirect(redirectUrl);
     } catch (error) {
       console.log("❌ /oauth-login - Error:", error);
       console.log("❌ /oauth-login - Error type:", typeof error);

@@ -47,6 +47,7 @@ export async function authenticateOAuthUser(email: string, password: string) {
     select: { 
       id: true, 
       username: true, 
+      email: true,
       password_hash: true, 
       role: true 
     }
@@ -108,7 +109,7 @@ export async function validateOAuthClient(clientId: string, redirectUri: string)
 
     return client;
   } catch (dbError) {
-    console.log("❌ validateOAuthClient - Database error, using fallback:", dbError.message);
+    console.log("❌ validateOAuthClient - Database error, using fallback:", dbError instanceof Error ? dbError.message : String(dbError));
     // Fallback validation
     if (clientId === 'nextjs_client' && redirectUri === 'http://localhost:3000/oauth/callback') {
       return { redirect_uris: ['http://localhost:3000/oauth/callback'] };
