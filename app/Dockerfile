@@ -1,29 +1,27 @@
-# syntax=docker/dockerfile:1
-
-ARG NODE_VERSION=24.13.0
-FROM node:${NODE_VERSION}-alpine
-
-# Nu setăm NODE_ENV=production pentru dev
-ENV NODE_ENV=development
-
-# Install Bun globally and OpenSSL
-RUN npm install -g bun && \
-    apk add --no-cache openssl libssl3 libcrypto3
-
+# Use the official Bun image (Alpine for a smaller footprint)
+FROM oven/bun:1.1-alpine AS base
 WORKDIR /usr/src/app
 
-# Copy deps first (cache friendly)
-COPY package.json bun.lock ./
+# Install necessary system dependencies for Prisma/SSL
+# Alpine needs these to run the Prisma engine binary
+RUN apk add --no-cache openssl libssl3 libcrypto3
+
+# Install dependencies (using a cache-friendly approach)
+COPY package.json bun.lockb* ./ 
 RUN bun install --frozen-lockfile
 
-# Copy all source files
+# Copy the rest of the application
 COPY . .
 
-# Generate Prisma Client for Linux
-RUN npx prisma generate
+# Generate Prisma Client
+# Bun can run 'prisma' directly if it's in your dependencies
+RUN bunx prisma generate
 
-# Expose port for dev server
+# Expose the dev server port
 EXPOSE 4000
 
-# Run dev server
+# Set environment to development
+ENV NODE_ENV=development
+
+# Start the dev server
 CMD ["bun", "run", "dev"]
